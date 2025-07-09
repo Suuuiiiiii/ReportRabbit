@@ -102,7 +102,7 @@ def report_instagram(username, vpn, amount, report_type):
         except Exception as e:
             print(f"   [!] Error: {e}")
 
-        if vpn and (i % 5 == 0):
+        if vpn
             rotate_ip()
 
         time.sleep(random.randint(2, 5))
