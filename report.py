@@ -49,9 +49,35 @@ def ask_amount():
         else:
             print("[!] Enter a valid positive number.")
 
-def report_instagram(username, vpn, amount):
+def choose_report_type():
+    report_types = {
+        "1": "nudity",
+        "2": "sexual_activity",
+        "3": "harassment_or_bullying",
+        "4": "hate_speech_or_symbols",
+        "5": "spam",
+        "6": "suicide_or_self_injury",
+        "7": "false_information",
+        "8": "illegal_or_regulated_goods",
+        "9": "scam_or_fraud",
+        "10": "intellectual_property_violation"
+    }
+
+    print("\n:: Choose Report Type ::")
+    for key, value in report_types.items():
+        print(f"{key}. {value.replace('_', ' ').title()}")
+
+    while True:
+        choice = input("[type number] : ").strip()
+        if choice in report_types:
+            print(f"\n[✓] Selected: {report_types[choice].replace('_', ' ').title()}\n")
+            return report_types[choice]
+        else:
+            print("[!] Invalid input. Please choose a number between 1 and 10.")
+
+def report_instagram(username, vpn, amount, report_type):
     for i in range(amount):
-        print(f"[{i+1}/{amount}] Reporting @{username}...")
+        print(f"[{i+1}/{amount}] Reporting @{username} for {report_type.replace('_', ' ').title()}...")
 
         url = "https://help.instagram.com/ajax/help/contact/submit/page"
         headers = {
@@ -60,18 +86,17 @@ def report_instagram(username, vpn, amount):
             "X-Requested-With": "XMLHttpRequest"
         }
 
-        report_type = random.choice(["nudity", "sexual_content", "spam"])
         data = {
             "username": username,
             "report_type": report_type,
-            "lsd": "mocktoken123",  # placeholder
+            "lsd": "mocktoken123",  # Placeholder for now
             "__ajax__": "1"
         }
 
         try:
             res = requests.post(url, headers=headers, data=data, timeout=10)
             if res.status_code == 200:
-                print(f"   [✓] Report sent as {report_type}")
+                print(f"   [✓] Report sent")
             else:
                 print(f"   [X] Failed ({res.status_code})")
         except Exception as e:
@@ -91,5 +116,6 @@ if __name__ == "__main__":
     username = get_username()
     vpn = ask_vpn()
     amount = ask_amount()
+    report_type = choose_report_type()
 
-    report_instagram(username, vpn, amount)
+    report_instagram(username, vpn, amount, report_type)
