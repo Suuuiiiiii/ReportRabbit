@@ -26,55 +26,70 @@ def choose_platform():
         else:
             print("[!] Invalid input. Please enter a number between 1 and 4.")
 
-def report_instagram(username):
-    print(f"[>] Reporting @{username} to Instagram...")
+def get_username():
+    username = input("Enter the target username (no @): ").strip()
+    if username == "":
+        print("[!] Username cannot be empty.")
+        sys.exit(1)
+    return username
 
-    url = "https://help.instagram.com/ajax/help/contact/submit/page"
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-Requested-With": "XMLHttpRequest"
-    }
-
-    report_type = random.choice(["nudity", "sexual_content", "spam"])
-    data = {
-        "username": username,
-        "report_type": report_type,
-        "lsd": "mocktoken123",  # This may need to be extracted in future
-        "__ajax__": "1"
-    }
-
-    try:
-        res = requests.post(url, headers=headers, data=data, timeout=10)
-        if res.status_code == 200:
-            print(f"[✓] Report sent for @{username} as {report_type}")
+def ask_vpn():
+    while True:
+        vpn = input("Use VPN? (1 = Yes, 0 = No): ").strip()
+        if vpn in ["0", "1"]:
+            return vpn == "1"
         else:
-            print(f"[X] Failed ({res.status_code}) for @{username}")
-    except Exception as e:
-        print(f"[!] Error for @{username}: {e}")
+            print("[!] Invalid input. Enter 0 or 1.")
 
-def handle_platform(platform):
-    usernames = [
-        "pornpage1", "nsfw_account2", "softcore_spammer"
-    ]
-
-    for i, user in enumerate(usernames):
-        if platform == "Instagram":
-            report_instagram(user)
-        elif platform == "TikTok":
-            print(f"[x] TikTok report logic not implemented yet for {user}")
-        elif platform == "Facebook":
-            print(f"[x] Facebook report logic not implemented yet for {user}")
-        elif platform == "YouTube":
-            print(f"[x] YouTube report logic not implemented yet for {user}")
+def ask_amount():
+    while True:
+        amount = input("How many reports? ").strip()
+        if amount.isdigit() and int(amount) > 0:
+            return int(amount)
         else:
-            print("[!] Unknown platform.")
-            sys.exit(1)
+            print("[!] Enter a valid positive number.")
 
-        time.sleep(random.randint(2, 5))
-        if i % 5 == 0:
+def report_instagram(username, vpn, amount):
+    for i in range(amount):
+        print(f"[{i+1}/{amount}] Reporting @{username}...")
+
+        url = "https://help.instagram.com/ajax/help/contact/submit/page"
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Requested-With": "XMLHttpRequest"
+        }
+
+        report_type = random.choice(["nudity", "sexual_content", "spam"])
+        data = {
+            "username": username,
+            "report_type": report_type,
+            "lsd": "mocktoken123",  # placeholder
+            "__ajax__": "1"
+        }
+
+        try:
+            res = requests.post(url, headers=headers, data=data, timeout=10)
+            if res.status_code == 200:
+                print(f"   [✓] Report sent as {report_type}")
+            else:
+                print(f"   [X] Failed ({res.status_code})")
+        except Exception as e:
+            print(f"   [!] Error: {e}")
+
+        if vpn and (i % 5 == 0):
             rotate_ip()
 
+        time.sleep(random.randint(2, 5))
+
 if __name__ == "__main__":
-    selected = choose_platform()
-    handle_platform(selected)
+    platform = choose_platform()
+    if platform != "Instagram":
+        print(f"[x] Reporting for {platform} is not implemented yet.")
+        sys.exit(0)
+
+    username = get_username()
+    vpn = ask_vpn()
+    amount = ask_amount()
+
+    report_instagram(username, vpn, amount)
