@@ -1,4 +1,4 @@
-from ascii import show_banner
+from ASCII import show_banner
 from account_creator import create_account
 from mailtm import generate_address
 from vpn import connect_to_random
