@@ -1,6 +1,2 @@
-playwright==1.44
-requests==2.32.3
-termcolor==2.4.0
-python-dotenv==1.0.1
-fake-useragent==1.5.1
-PySocks==1.7.1
+playwright==1.43.0
+requests==2.31.0
