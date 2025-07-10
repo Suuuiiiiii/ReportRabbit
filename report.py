@@ -2,69 +2,101 @@ from vpn import connect_vpn, disconnect_vpn
 from mailtm import create_temp_email
 from account_creator import create_account
 from reporter import submit_report
-from utils import generate_name, generate_password, print_banner
+
+import random
+import string
 import time
+import sys
 
-def main():
-    print_banner()
-    print("=== P.D.O - Porn Down Operation ===\n")
-    target_username = input("Enter the Instagram username to report: ").strip()
+def generate_full_name():
+    first = random.choice(["Adam", "John", "David", "Ryan", "Mike", "Leo", "Sam", "Chris", "Josh"])
+    last = random.choice(["Smith", "Brown", "Taylor", "White", "Lee", "King", "Turner", "Baker"])
+    return f"{first} {last}"
 
+def generate_password(length=10):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+
+def prompt_number(msg, min_val, max_val):
     while True:
         try:
-            report_count = int(input("How many reports do you want to send? "))
-            if report_count <= 0:
-                raise ValueError
-            break
-        except ValueError:
-            print("[x] Please enter a valid positive number.")
+            value = int(input(msg))
+            if value < min_val or value > max_val:
+                print(f"[x] Please enter a number between {min_val} and {max_val}.")
+            else:
+                return value
+        except:
+            print("[x] Invalid input. Try again.")
 
-    for i in range(1, report_count + 1):
-        print(f"\n=== REPORT {i} / {report_count} ===")
+def main():
+    print(":: Instagram Report Tool — P.D.O ::")
+    print(":: 1 Instagram   |   2 TikTok   | 3 Facebook  | 4 YouTube ::")
+    platform_choice = prompt_number("[Platform Number]: ", 1, 1)  # Only Instagram for now
 
-        print("[>] Connecting to VPN...")
-        if not connect_vpn():
-            print("[x] Failed to connect to VPN. Retrying in 10 seconds...")
-            time.sleep(10)
-            continue
-        print("[✓] VPN connected.")
+    username = input("[Target Username]: ").strip()
+    vpn_choice = prompt_number("[VPN? 1=Yes / 0=No]: ", 0, 1)
+    amount = prompt_number("[Number of Reports]: ", 1, 100)
 
-        print("[>] Generating temporary email...")
+    print("\n:: Report Types ::")
+    print("1. Nudity")
+    print("2. Sexual Activity")
+    print("3. Harassment")
+    print("4. Spam")
+    print("5. Hate Speech")
+    print("6. False Info")
+    report_type = prompt_number("[Report Type Number]: ", 1, 6)
+
+    success = 0
+    fail = 0
+
+    for i in range(amount):
+        print(f"\n[•] Starting Report #{i+1}")
+
+        if vpn_choice:
+            print("[*] Connecting to VPN...")
+            if not connect_vpn():
+                print("[x] VPN failed.")
+                break
+
         email_data = create_temp_email()
         if not email_data:
-            print("[x] Could not get a temporary email. Skipping.")
-            disconnect_vpn()
+            print("[x] Failed to get temp email.")
+            fail += 1
             continue
-        email = email_data["address"]
-        email_token = email_data["token"]
 
-        print(f"[✓] Temp email created: {email}")
-
-        full_name = generate_name()
+        full_name = generate_full_name()
         password = generate_password()
 
-        print("[>] Creating Instagram account...")
-        result = create_account(email, email_token, full_name, password)
-        if result is None or not result.get("session"):
-            print("[x] Account creation failed. Cleaning up.")
-            disconnect_vpn()
+        account_data = create_account(
+            email_data["address"],
+            email_data["token"],
+            full_name,
+            password
+        )
+
+        if not account_data:
+            print("[x] Failed to create Instagram account.")
+            fail += 1
+            if vpn_choice:
+                disconnect_vpn()
             continue
 
-        session = result["session"]
-        username_created = result["username"]
-        print(f"[✓] Account created: @{username_created}")
+        session = account_data["session"]
+        result = submit_report(session, username, report_type)
 
-        print("[>] Submitting report...")
-        success = submit_report(session, target_username)
-        if success:
-            print(f"[✓] Report submitted against @{target_username}")
+        if result:
+            success += 1
         else:
-            print("[x] Report submission failed.")
+            fail += 1
 
-        print("[>] Disconnecting VPN...")
-        disconnect_vpn()
+        if vpn_choice:
+            print("[*] Disconnecting VPN...")
+            disconnect_vpn()
 
-    print(f"\n[✔] Finished sending {report_count} report(s).")
+    print(f"\n[✓] Done! Success: {success}, Failed: {fail}")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[x] Interrupted.")
+        sys.exit(0)
