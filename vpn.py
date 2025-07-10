@@ -1,62 +1,49 @@
-import requests
-import time
+import subprocess
 import random
-import string
+import time
 
-class TempMail:
-    def __init__(self):
-        self.base = "https://api.mail.tm"
-        self.session = requests.Session()
-        self.domain = self.get_domain()
+# Recommended Windscribe server locations
+WIND_LOCATIONS = [
+    "US", "CA", "FR", "DE", "GB", "NL", "NO", "RO", "SG", "TR"
+]
 
-    def get_domain(self):
-        try:
-            res = self.session.get(f"{self.base}/domains").json()
-            return res['hydra:member'][0]['domain']
-        except:
-            print("[✗] Failed to fetch mail.tm domain.")
-            return "mail.tm"
+def is_windscribe_installed():
+    try:
+        subprocess.run(["windscribe", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except FileNotFoundError:
+        return False
 
-    def generate_email(self):
-        local = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
-        email = f"{local}@{self.domain}"
-        password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+def is_logged_in():
+    try:
+        result = subprocess.run(["windscribe", "account"], capture_output=True, text=True)
+        return "Account" in result.stdout
+    except:
+        return False
 
-        res = self.session.post(f"{self.base}/accounts", json={
-            "address": email,
-            "password": password
-        })
+def connect_vpn():
+    if not is_windscribe_installed():
+        print("[x] Windscribe CLI not found.")
+        return False
 
-        if res.status_code == 201:
-            print(f"[+] Email account created: {email}")
-        else:
-            print("[✗] Failed to create temp email.")
-            return None, None
+    if not is_logged_in():
+        print("[x] Windscribe not logged in. Please run 'windscribe login' first.")
+        return False
 
-        token = self.session.post(f"{self.base}/token", json={
-            "address": email,
-            "password": password
-        }).json().get("token")
+    location = random.choice(WIND_LOCATIONS)
+    try:
+        print(f"[*] Connecting to VPN ({location})...")
+        subprocess.run(["windscribe", "connect", location], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(2)
+        return True
+    except Exception as e:
+        print(f"[x] VPN connection failed: {e}")
+        return False
 
-        self.session.headers.update({"Authorization": f"Bearer {token}"})
-        return email, self.get_mailbox_id()
-
-    def get_mailbox_id(self):
-        res = self.session.get(f"{self.base}/me").json()
-        return res.get("id")
-
-    def wait_for_code(self, mailbox_id, timeout=120):
-        print("[*] Waiting for Instagram email verification...")
-        start = time.time()
-        while time.time() - start < timeout:
-            res = self.session.get(f"{self.base}/messages").json()
-            for msg in res.get("hydra:member", []):
-                if "Instagram" in msg["from"]["address"]:
-                    print("[✓] Verification email received.")
-                    return self.extract_code(msg["intro"])
-            time.sleep(5)
-        print("[✗] Timeout waiting for code.")
-        return None
-
-    def extract_code(self, text):
-        return ''.join(filter(str.isdigit, text))[:6]
+def disconnect_vpn():
+    try:
+        subprocess.run(["windscribe", "disconnect"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(1)
+        return True
+    except:
+        return False
