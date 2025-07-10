@@ -1,19 +1,21 @@
 #!/bin/bash
-set -e
 
-echo "🔧 Installing system dependencies..."
-sudo apt update
-sudo apt install -y python3-venv python3-pip
+echo "🔧 Setting up ReportRabbit..."
 
-echo "🐍 Creating virtual environment..."
-python3 -m venv venv
-
-echo "🔄 Activating venv and installing Python dependencies..."
-source venv/bin/activate
-pip install --upgrade pip
+# Install Python deps
+echo "📦 Installing Python requirements..."
 pip install -r requirements.txt
-python -m playwright install
 
-echo "✅ Setup complete! Run like this:"
-echo "   source venv/bin/activate"
-echo "   python main.py --target <username> --cycles <number>"
+# Playwright setup
+echo "🎭 Installing Playwright browsers..."
+playwright install
+
+# Windscribe check
+if ! command -v windscribe &> /dev/null; then
+    echo "⚠️  Windscribe CLI not found. Install it manually from https://windscribe.com/guides/linux"
+else
+    echo "✅ Windscribe found."
+fi
+
+echo "✅ Setup complete. You can now run the tool with:"
+echo "   python3 main.py"
