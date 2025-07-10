@@ -1,87 +1,80 @@
 import requests
+import time
 import random
 import string
-import time
 
-MAILTM_API = "https://api.mail.tm"
-HEADERS = {"Content-Type": "application/json"}
+class TempMail:
+    def __init__(self):
+        self.base_url = "https://api.mail.tm"
+        self.session = requests.Session()
+        self.token = None
+        self.mailbox_id = None
+        self.email = None
+        self.password = None
+        self.domain = self._get_domain()
 
-def generate_random_string(length=10):
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
+    def _get_domain(self):
+        try:
+            res = self.session.get(f"{self.base_url}/domains")
+            res.raise_for_status()
+            return res.json()['hydra:member'][0]['domain']
+        except:
+            print("[✗] Failed to fetch mail.tm domain. Using fallback.")
+            return "mail.tm"
 
-def create_temp_email():
-    try:
-        username = generate_random_string()
-        password = generate_random_string(12)
-        email_address = f"{username}@mail.tm"
+    def generate_email(self):
+        self.email = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10)) + f"@{self.domain}"
+        self.password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
 
-        # Create account
-        res = requests.post(f"{MAILTM_API}/accounts", json={
-            "address": email_address,
-            "password": password
-        }, headers=HEADERS)
+        # Register mailbox
+        acc_res = self.session.post(f"{self.base_url}/accounts", json={
+            "address": self.email,
+            "password": self.password
+        })
 
-        if res.status_code != 201 and "already exists" not in res.text:
-            print("[x] Failed to create mail.tm account.")
-            return None
+        if acc_res.status_code != 201:
+            print("[✗] Failed to create email account.")
+            return None, None
 
         # Get token
-        res = requests.post(f"{MAILTM_API}/token", json={
-            "address": email_address,
-            "password": password
-        }, headers=HEADERS)
+        token_res = self.session.post(f"{self.base_url}/token", json={
+            "address": self.email,
+            "password": self.password
+        })
 
-        if res.status_code != 200:
-            print("[x] Failed to authenticate with mail.tm.")
-            return None
+        if token_res.status_code != 200:
+            print("[✗] Failed to retrieve mail.tm token.")
+            return None, None
 
-        token = res.json()["token"]
-        return {
-            "address": email_address,
-            "password": password,
-            "token": token
-        }
+        self.token = token_res.json()["token"]
+        self.session.headers.update({"Authorization": f"Bearer {self.token}"})
 
-    except Exception as e:
-        print(f"[x] Error creating temp email: {e}")
+        # Get mailbox ID
+        profile = self.session.get(f"{self.base_url}/me").json()
+        self.mailbox_id = profile.get("id")
+
+        print(f"[+] Mailbox ready: {self.email}")
+        return self.email, self.mailbox_id
+
+    def wait_for_code(self, timeout=120):
+        print("[*] Waiting for Instagram verification email...")
+        start = time.time()
+
+        while time.time() - start < timeout:
+            try:
+                res = self.session.get(f"{self.base_url}/messages")
+                res.raise_for_status()
+                messages = res.json().get("hydra:member", [])
+                for msg in messages:
+                    if "Instagram" in msg["from"]["address"]:
+                        print("[✓] Verification email received.")
+                        return self._extract_code(msg["intro"])
+            except Exception as e:
+                print(f"[!] Mailbox check failed: {e}")
+            time.sleep(5)
+
+        print("[✗] Timeout waiting for verification code.")
         return None
 
-def wait_for_verification_code(token, timeout=120):
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
-
-    print("[*] Waiting for Instagram verification email...")
-    start_time = time.time()
-
-    while time.time() - start_time < timeout:
-        try:
-            res = requests.get(f"{MAILTM_API}/messages", headers=headers)
-            if res.status_code != 200:
-                print("[x] Failed to check inbox.")
-                time.sleep(5)
-                continue
-
-            messages = res.json().get("hydra:member", [])
-            for msg in messages:
-                if "Instagram" in msg.get("from", {}).get("address", "") or "Instagram" in msg.get("subject", ""):
-                    msg_id = msg["id"]
-                    msg_res = requests.get(f"{MAILTM_API}/messages/{msg_id}", headers=headers)
-                    if msg_res.status_code == 200:
-                        body = msg_res.json().get("text", "")
-                        code = extract_code_from_text(body)
-                        if code:
-                            print(f"[✓] Verification code received: {code}")
-                            return code
-        except Exception as e:
-            print(f"[x] Error checking inbox: {e}")
-
-        time.sleep(5)
-
-    print("[x] Timeout waiting for verification code.")
-    return None
-
-def extract_code_from_text(text):
-    import re
-    match = re.search(r"\b(\d{6})\b", text)
-    return match.group(1) if match else None
+    def _extract_code(self, text):
+        return ''.join(filter(str.isdigit, text))[:6]
