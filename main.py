@@ -1,18 +1,27 @@
 import asyncio
+import os
+import traceback
+import argparse
 from termcolor import cprint
 from dotenv import load_dotenv
-import os
 
 from vpn import connect_vpn, disconnect_vpn
 from mailtm import TempMail
 from account_creator import create_instagram_account
 from reporter import submit_report, last_reason_used
 from log import write_log
+from history import log_history
 
-# Load .env configuration
+# CLI argument parsing
+parser = argparse.ArgumentParser(description="P.D.O - Porn Down Operation")
+parser.add_argument("--target", help="Instagram username to report")
+parser.add_argument("--cycles", type=int, help="Number of report cycles")
+args = parser.parse_args()
+
+# Load .env and config
 load_dotenv()
-TARGET_USERNAME = os.getenv("TARGET_USERNAME", "default_user")
-REPORT_CYCLES = int(os.getenv("REPORT_CYCLES", "1"))
+TARGET_USERNAME = args.target or os.getenv("TARGET_USERNAME", "default_user")
+REPORT_CYCLES = args.cycles or int(os.getenv("REPORT_CYCLES", "1"))
 
 def banner():
     cprint(r"""
@@ -53,14 +62,12 @@ async def run_report_cycle(cycle_num):
     write_log(f"Instagram account created using {email}")
 
     result = await submit_report(session, TARGET_USERNAME)
-    if result:
-        print("[✓] Report sent.")
-        write_log(f"Report sent successfully to @{TARGET_USERNAME}")
-        if last_reason_used:
-            write_log(f"Reason used: {last_reason_used}")
-    else:
-        print("[✗] Report failed.")
-        write_log(f"Report failed for @{TARGET_USERNAME}")
+    status = "Success" if result else "Failed"
+    write_log(f"Report {'submitted' if result else 'failed'} for @{TARGET_USERNAME}")
+    if last_reason_used:
+        write_log(f"Reason used: {last_reason_used}")
+
+    log_history(email, TARGET_USERNAME, last_reason_used or "Unknown", status)
 
     disconnect_vpn()
     write_log("VPN disconnected.\n")
@@ -68,7 +75,15 @@ async def run_report_cycle(cycle_num):
 async def main():
     banner()
     for i in range(REPORT_CYCLES):
-        await run_report_cycle(i)
+        try:
+            await run_report_cycle(i)
+        except Exception as e:
+            error_message = f"[Cycle {i+1}] Exception: {e}"
+            print(f"[!] {error_message}")
+            write_log(error_message)
+            with open("pdo_error.log", "a") as errlog:
+                errlog.write(f"\n{error_message}\n")
+                errlog.write(traceback.format_exc())
     print("\n[✓] All cycles completed.")
     write_log("All report cycles completed.\n")
 
