@@ -1,5 +1,5 @@
 # 🔧 Core dependencies
-playwright==1.44.0        # Browser automation (Chromium + control)
+playwright==1.44        # Browser automation (Chromium + control)
 requests==2.32.3          # HTTP API requests (Mail.tm, IP check)
 termcolor==2.4.0          # Colored CLI banners/logs
 
