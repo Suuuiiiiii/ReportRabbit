@@ -1,82 +1,45 @@
-import asyncio
-from playwright.async_api import async_playwright
 import random
 import time
+from playwright.async_api import async_playwright
 
-REPORT_REASONS = [
-    "It's inappropriate",  # default path
-    # Additional report paths can be added here later
-]
+HELP_CENTER_URL = "https://help.instagram.com/contact/497253480400030"  # Report a user
 
-async def report_account(username: str, session_id: str):
+async def submit_report(session_storage, target_username):
+    print(f"[•] Reporting user: {target_username}")
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            user_agent=random_user_agent(),
-            storage_state={
-                "cookies": [
-                    {
-                        "name": "sessionid",
-                        "value": session_id,
-                        "domain": ".instagram.com",
-                        "path": "/",
-                        "httpOnly": True,
-                        "secure": True
-                    }
-                ]
-            }
-        )
-
+        context = await browser.new_context(storage_state=session_storage)
         page = await context.new_page()
 
         try:
-            print(f"[+] Navigating to profile: {username}")
-            await page.goto(f"https://www.instagram.com/{username}/", timeout=30000)
-            await page.wait_for_selector('svg[aria-label="Options"]', timeout=15000)
+            await page.goto(HELP_CENTER_URL, timeout=30000)
 
-            print("[+] Clicking the ⋯ menu")
-            await page.click('svg[aria-label="Options"]')
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            # Wait for form to load
+            await page.wait_for_selector("input[name='Field1785749746197248']", timeout=10000)
 
-            print("[+] Clicking 'Report'")
-            await page.click('text=Report')
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            print("[*] Filling report form...")
 
-            print("[+] Selecting 'It\'s inappropriate'")
-            await page.click('text=It\'s inappropriate')
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            # Fill target account URL
+            target_url = f"https://www.instagram.com/{target_username}/"
+            await page.fill("input[name='Field1785749746197248']", target_url)
 
-            print("[+] Selecting 'Report account'")
-            await page.click('text=Report Account')
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            # Select reason from dropdown (Posting inappropriate content)
+            await page.select_option("select[name='Field1785749746197252']", label="Nudity or pornography")
 
-            print("[+] Choosing reason: 'Posting inappropriate content'")
-            await page.click('text=Posting inappropriate content')
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            # (Optional) Fill description box
+            await page.fill("textarea[name='Field1785749746197256']", "This account is sharing explicit adult content.")
 
-            print("[+] Submitting report")
-            await page.click('text=Submit')
-            await asyncio.sleep(1.5)
+            # Submit the form
+            await page.click("button[type='submit']")
 
+            await page.wait_for_timeout(3000)
             print("[✓] Report submitted successfully.")
-        except Exception as e:
-            print(f"[✗] Failed to report: {e}")
-        finally:
+
             await browser.close()
+            return True
 
-def random_user_agent():
-    # Keep it simple — or fetch from list/fake_useragent if needed
-    agents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0 Safari/537.36"
-    ]
-    return random.choice(agents)
-
-# Entry point for testing
-if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) != 3:
-        print("Usage: python reporter.py <username> <sessionid>")
-    else:
-        asyncio.run(report_account(sys.argv[1], sys.argv[2]))
+        except Exception as e:
+            print(f"[✗] Failed to submit report: {e}")
+            await browser.close()
+            return False
