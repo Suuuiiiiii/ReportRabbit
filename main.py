@@ -6,7 +6,7 @@ import os
 from vpn import connect_vpn, disconnect_vpn
 from mailtm import TempMail
 from account_creator import create_instagram_account
-from reporter import submit_report
+from reporter import submit_report, last_reason_used
 from log import write_log
 
 # Load .env configuration
@@ -56,6 +56,8 @@ async def run_report_cycle(cycle_num):
     if result:
         print("[✓] Report sent.")
         write_log(f"Report sent successfully to @{TARGET_USERNAME}")
+        if last_reason_used:
+            write_log(f"Reason used: {last_reason_used}")
     else:
         print("[✗] Report failed.")
         write_log(f"Report failed for @{TARGET_USERNAME}")
