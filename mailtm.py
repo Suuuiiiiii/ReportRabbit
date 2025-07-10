@@ -1,67 +1,73 @@
-import random
-import string
+import requests
 import time
-from playwright.async_api import async_playwright
-from mailtm import TempMail
+import re
 
-def generate_random_name():
-    return random.choice(["Adam", "Eva", "Zane", "Lina", "Rami", "Maya", "Leo", "Nora"]) + \
-           " " + random.choice(["Smith", "Zidan", "Ali", "Khan", "Lee", "Frost"])
+BASE_URL = "https://api.mail.tm"
 
-def generate_username():
-    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+def create_temp_email():
+    try:
+        print("[*] Generating temporary email...")
+        domain_resp = requests.get(f"{BASE_URL}/domains")
+        domain_resp.raise_for_status()
+        domain = domain_resp.json()["hydra:member"][0]["domain"]
 
-def generate_password():
-    return ''.join(random.choices(string.ascii_letters + string.digits + "!@#", k=12))
+        username = f"pdo{int(time.time())}"
+        address = f"{username}@{domain}"
+        password = "PDOtool123"
 
-async def create_instagram_account(email, mailbox_id, mail: TempMail):
-    full_name = generate_random_name()
-    username = generate_username()
-    password = generate_password()
+        # Register
+        register = requests.post(f"{BASE_URL}/accounts", json={
+            "address": address,
+            "password": password
+        })
 
-    print(f"[•] Creating IG account: {username}")
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) " +
-                       "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1",
-            viewport={"width": 390, "height": 844}
-        )
-        page = await context.new_page()
-
-        try:
-            await page.goto("https://www.instagram.com/accounts/emailsignup/", timeout=60000)
-
-            await page.fill("input[name=emailOrPhone]", email)
-            await page.fill("input[name=fullName]", full_name)
-            await page.fill("input[name=username]", username)
-            await page.fill("input[name=password]", password)
-
-            await page.click("button[type=submit]")
-            await page.wait_for_timeout(3000)
-
-            print("[*] Waiting for verification code...")
-            code = mail.wait_for_code()
-
-            if not code:
-                print("[✗] No code received. Aborting.")
-                await browser.close()
-                return None
-
-            print(f"[✓] Got code: {code}")
-
-            await page.fill("input[name='email_confirmation_code']", code)
-            await page.click("button[type=submit]")
-            await page.wait_for_timeout(5000)
-
-            print("[✓] Account created successfully!")
-
-            storage = await context.storage_state()
-            await browser.close()
-            return storage
-
-        except Exception as e:
-            print(f"[✗] Error during signup: {e}")
-            await browser.close()
+        if register.status_code != 201:
+            print("[x] Failed to register temp email.")
             return None
+
+        # Authenticate
+        auth = requests.post(f"{BASE_URL}/token", json={
+            "address": address,
+            "password": password
+        })
+
+        if auth.status_code != 200:
+            print("[x] Failed to authenticate temp email.")
+            return None
+
+        token = auth.json()["token"]
+        print(f"[✓] Temp email created: {address}")
+        return {"address": address, "token": token}
+
+    except Exception as e:
+        print(f"[x] Mail.tm error: {e}")
+        return None
+
+
+def wait_for_code(token, timeout=120):
+    print("[*] Waiting for verification code...")
+    headers = {"Authorization": f"Bearer {token}"}
+    start = time.time()
+
+    while time.time() - start < timeout:
+        try:
+            msgs = requests.get(f"{BASE_URL}/messages", headers=headers)
+            msgs.raise_for_status()
+            messages = msgs.json()["hydra:member"]
+
+            for msg in messages:
+                if "Instagram" in msg["from"]["address"] or "security code" in msg["subject"]:
+                    msg_detail = requests.get(f"{BASE_URL}/messages/{msg['id']}", headers=headers)
+                    content = msg_detail.json()["text"]
+                    match = re.search(r"\b(\d{6})\b", content)
+                    if match:
+                        code = match.group(1)
+                        print(f"[✓] Code received: {code}")
+                        return code
+        except:
+            pass
+
+        time.sleep(5)
+
+    print("[x] Timed out waiting for code.")
+    return None
