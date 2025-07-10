@@ -1,2 +1,7 @@
 requests
 playwright
+requests
+fake_useragent
+python-dotenv
+termcolor
+PySocks
