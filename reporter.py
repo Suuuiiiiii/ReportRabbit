@@ -13,14 +13,19 @@ REPORT_REASONS = {
     "6": "False information"
 }
 
+# Global variable to allow main.py to access last selected reason
+last_reason_used = None
+
 def choose_reason():
+    global last_reason_used
     print("\n[?] Choose a report reason:")
     for key, label in REPORT_REASONS.items():
         print(f"{key}. {label}")
     while True:
         choice = input("Enter reason number: ").strip()
         if choice in REPORT_REASONS:
-            return REPORT_REASONS[choice]
+            last_reason_used = REPORT_REASONS[choice]
+            return last_reason_used
         print("[!] Invalid choice. Try again.")
 
 async def submit_report(session_storage, target_username):
