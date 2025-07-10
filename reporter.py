@@ -4,32 +4,40 @@ from playwright.async_api import async_playwright
 
 HELP_CENTER_URL = "https://help.instagram.com/contact/497253480400030"
 
-REPORT_REASONS = {
-    "1": "Nudity or pornography",
-    "2": "Hate speech or symbols",
-    "3": "Violence or dangerous organizations",
-    "4": "Scam or fraud",
-    "5": "Suicide or self-injury",
-    "6": "False information"
-}
+last_reason_used = None  # Track last selected reason for logging
 
-# Global variable to allow main.py to access last selected reason
-last_reason_used = None
+def load_reasons_from_file():
+    try:
+        with open("report_reasons.txt", "r") as f:
+            reasons = [line.strip() for line in f if line.strip()]
+        return reasons
+    except FileNotFoundError:
+        print("[!] report_reasons.txt not found.")
+        return []
 
 def choose_reason():
     global last_reason_used
+    reasons = load_reasons_from_file()
+    if not reasons:
+        print("[!] No reasons available.")
+        return None
+
     print("\n[?] Choose a report reason:")
-    for key, label in REPORT_REASONS.items():
-        print(f"{key}. {label}")
+    for i, reason in enumerate(reasons, 1):
+        print(f"{i}. {reason}")
     while True:
         choice = input("Enter reason number: ").strip()
-        if choice in REPORT_REASONS:
-            last_reason_used = REPORT_REASONS[choice]
+        if choice.isdigit() and 1 <= int(choice) <= len(reasons):
+            last_reason_used = reasons[int(choice) - 1]
             return last_reason_used
         print("[!] Invalid choice. Try again.")
 
 async def submit_report(session_storage, target_username):
     reason_label = choose_reason()
+    if not reason_label:
+        print("[!] No valid reason selected. Aborting.")
+        return False
+
     print(f"[•] Reporting @{target_username} for: {reason_label}")
 
     async with async_playwright() as p:
@@ -50,7 +58,7 @@ async def submit_report(session_storage, target_username):
             # Select reason
             await page.select_option("select[name='Field1785749746197252']", label=reason_label)
 
-            # Description (optional)
+            # Optional description
             await page.fill("textarea[name='Field1785749746197256']", f"This account is violating the rules due to: {reason_label.lower()}.")
 
             await page.click("button[type='submit']")
