@@ -1,80 +1,67 @@
-import requests
-import time
 import random
 import string
+import time
+from playwright.async_api import async_playwright
+from mailtm import TempMail
 
-class TempMail:
-    def __init__(self):
-        self.base_url = "https://api.mail.tm"
-        self.session = requests.Session()
-        self.token = None
-        self.mailbox_id = None
-        self.email = None
-        self.password = None
-        self.domain = self._get_domain()
+def generate_random_name():
+    return random.choice(["Adam", "Eva", "Zane", "Lina", "Rami", "Maya", "Leo", "Nora"]) + \
+           " " + random.choice(["Smith", "Zidan", "Ali", "Khan", "Lee", "Frost"])
 
-    def _get_domain(self):
+def generate_username():
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+
+def generate_password():
+    return ''.join(random.choices(string.ascii_letters + string.digits + "!@#", k=12))
+
+async def create_instagram_account(email, mailbox_id, mail: TempMail):
+    full_name = generate_random_name()
+    username = generate_username()
+    password = generate_password()
+
+    print(f"[•] Creating IG account: {username}")
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) " +
+                       "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1",
+            viewport={"width": 390, "height": 844}
+        )
+        page = await context.new_page()
+
         try:
-            res = self.session.get(f"{self.base_url}/domains")
-            res.raise_for_status()
-            return res.json()['hydra:member'][0]['domain']
-        except:
-            print("[✗] Failed to fetch mail.tm domain. Using fallback.")
-            return "mail.tm"
+            await page.goto("https://www.instagram.com/accounts/emailsignup/", timeout=60000)
 
-    def generate_email(self):
-        self.email = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10)) + f"@{self.domain}"
-        self.password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+            await page.fill("input[name=emailOrPhone]", email)
+            await page.fill("input[name=fullName]", full_name)
+            await page.fill("input[name=username]", username)
+            await page.fill("input[name=password]", password)
 
-        # Register mailbox
-        acc_res = self.session.post(f"{self.base_url}/accounts", json={
-            "address": self.email,
-            "password": self.password
-        })
+            await page.click("button[type=submit]")
+            await page.wait_for_timeout(3000)
 
-        if acc_res.status_code != 201:
-            print("[✗] Failed to create email account.")
-            return None, None
+            print("[*] Waiting for verification code...")
+            code = mail.wait_for_code()
 
-        # Get token
-        token_res = self.session.post(f"{self.base_url}/token", json={
-            "address": self.email,
-            "password": self.password
-        })
+            if not code:
+                print("[✗] No code received. Aborting.")
+                await browser.close()
+                return None
 
-        if token_res.status_code != 200:
-            print("[✗] Failed to retrieve mail.tm token.")
-            return None, None
+            print(f"[✓] Got code: {code}")
 
-        self.token = token_res.json()["token"]
-        self.session.headers.update({"Authorization": f"Bearer {self.token}"})
+            await page.fill("input[name='email_confirmation_code']", code)
+            await page.click("button[type=submit]")
+            await page.wait_for_timeout(5000)
 
-        # Get mailbox ID
-        profile = self.session.get(f"{self.base_url}/me").json()
-        self.mailbox_id = profile.get("id")
+            print("[✓] Account created successfully!")
 
-        print(f"[+] Mailbox ready: {self.email}")
-        return self.email, self.mailbox_id
+            storage = await context.storage_state()
+            await browser.close()
+            return storage
 
-    def wait_for_code(self, timeout=120):
-        print("[*] Waiting for Instagram verification email...")
-        start = time.time()
-
-        while time.time() - start < timeout:
-            try:
-                res = self.session.get(f"{self.base_url}/messages")
-                res.raise_for_status()
-                messages = res.json().get("hydra:member", [])
-                for msg in messages:
-                    if "Instagram" in msg["from"]["address"]:
-                        print("[✓] Verification email received.")
-                        return self._extract_code(msg["intro"])
-            except Exception as e:
-                print(f"[!] Mailbox check failed: {e}")
-            time.sleep(5)
-
-        print("[✗] Timeout waiting for verification code.")
-        return None
-
-    def _extract_code(self, text):
-        return ''.join(filter(str.isdigit, text))[:6]
+        except Exception as e:
+            print(f"[✗] Error during signup: {e}")
+            await browser.close()
+            return None
