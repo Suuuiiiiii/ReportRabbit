@@ -1,66 +1,71 @@
-from playwright.sync_api import sync_playwright
+import requests
+import random
 import time
+from fake_useragent import UserAgent
 
-REPORT_OPTIONS = {
-    1: "Nudity or sexual activity",
-    2: "Bullying or harassment",
-    3: "Spam",
-    4: "Hate speech or symbols",
-    5: "False information"
-}
+# Instagram endpoints and constants
+BASE_URL = "https://www.instagram.com"
+REPORT_URL = f"{BASE_URL}/users/{'{user_id}'}/report/"
+USER_AGENT_FALLBACK = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:108.0) Gecko/20100101 Firefox/108.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0 Safari/537.36",
+]
 
-def submit_report(session_cookies, target_username, report_type):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
+def get_random_user_agent():
+    try:
+        return UserAgent().random
+    except:
+        return random.choice(USER_AGENT_FALLBACK)
 
-        context.add_cookies([
-            {
-                "name": name,
-                "value": value,
-                "domain": ".instagram.com",
-                "path": "/",
-                "httpOnly": True,
-                "secure": True,
-                "sameSite": "Lax"
-            }
-            for name, value in session_cookies.items()
-        ])
+def build_headers(session_token):
+    return {
+        "User-Agent": get_random_user_agent(),
+        "X-IG-App-ID": "936619743392459",  # standard Instagram web app ID
+        "X-CSRFToken": session_token.get('csrf_token', ''),
+        "Referer": BASE_URL,
+        "Origin": BASE_URL,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "Cookie": f"sessionid={session_token['sessionid']}; csrftoken={session_token['csrf_token']};"
+    }
 
-        page = context.new_page()
-
+def fetch_user_id(username, headers):
+    url = f"{BASE_URL}/{username}/?__a=1&__d=dis"
+    res = requests.get(url, headers=headers)
+    if res.status_code == 200:
         try:
-            print(f"[*] Navigating to @{target_username}'s profile...")
-            page.goto(f"https://www.instagram.com/{target_username}/", timeout=30000)
-            page.wait_for_load_state('networkidle')
+            data = res.json()
+            return data['graphql']['user']['id']
+        except:
+            print("[!] Failed to parse user ID.")
+    else:
+        print(f"[!] Failed to fetch user ID. Status: {res.status_code}")
+    return None
 
-            print("[*] Opening report menu...")
-            page.click('svg[aria-label="More options"]')
+def report_user(username, session_token):
+    headers = build_headers(session_token)
+    print(f"[+] Getting user ID for @{username}...")
+    user_id = fetch_user_id(username, headers)
+    if not user_id:
+        print("[✗] Could not find user ID. Aborting.")
+        return False
 
-            page.wait_for_selector('text=Report', timeout=10000)
-            page.click('text=Report')
+    report_url = f"{BASE_URL}/users/{user_id}/report/"
+    payload = {
+        "source_name": "",
+        "reason_id": "1",  # "It's inappropriate"
+        "frx_context": ""
+    }
 
-            time.sleep(2)
-            page.click('text=It’s inappropriate')
-            time.sleep(2)
-            page.click('text=Report account')
-            time.sleep(2)
+    print(f"[+] Submitting report for @{username} (user ID: {user_id})...")
+    time.sleep(random.uniform(1.5, 3.0))  # Simulate human delay
+    res = requests.post(report_url, headers=headers, data=payload)
 
-            reason_text = REPORT_OPTIONS.get(report_type)
-            if reason_text:
-                page.click(f'text={reason_text}')
-                time.sleep(2)
-                page.click('text=Submit report')
-                print(f"[✓] Report sent for reason: {reason_text}")
-                return True
-            else:
-                print("[x] Invalid report type passed.")
-                return False
-
-        except Exception as e:
-            print(f"[x] Report failed: {e}")
-            return False
-
-        finally:
-            context.close()
-            browser.close()
+    if res.status_code == 200:
+        print("[✓] Report submitted successfully.")
+        return True
+    else:
+        print(f"[✗] Report failed. Status: {res.status_code}")
+        print("Response:", res.text)
+        return False
