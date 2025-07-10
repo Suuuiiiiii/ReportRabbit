@@ -18,6 +18,13 @@ def create_account(email, token, full_name, password):
             page.goto("https://www.instagram.com/accounts/emailsignup/", timeout=60000)
             page.wait_for_load_state("networkidle")
 
+            # Try to dismiss cookie popup
+            try:
+                page.click('button:has-text("Decline optional cookies")', timeout=5000)
+                print("[✓] Cookie banner dismissed")
+            except:
+                print("[!] No cookie banner to dismiss")
+
             # Fill the form
             page.fill('input[name="emailOrPhone"]', email)
             page.fill('input[name="fullName"]', full_name)
