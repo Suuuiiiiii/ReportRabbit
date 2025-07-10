@@ -1,68 +1,66 @@
-from playwright.sync_api import sync_playwright
+from ascii import show_banner
+from account_creator import create_account
+from mailtm import generate_address
+from vpn import connect_to_random
+import random
+import string
 import time
 
-REPORT_OPTIONS = {
-    1: "Nudity or sexual activity",
-    2: "Bullying or harassment",
-    3: "Spam",
-    4: "Hate speech or symbols",
-    5: "False information"
-}
+def random_string(length=8):
+    return ''.join(random.choices(string.ascii_letters, k=length))
 
-def submit_report(session_cookies, target_username, report_type):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
+def run_report_flow():
+    show_banner()
 
-        # Apply session cookies to simulate logged-in session
-        context.add_cookies([
-            {
-                "name": name,
-                "value": value,
-                "domain": ".instagram.com",
-                "path": "/",
-                "httpOnly": True,
-                "secure": True,
-                "sameSite": "Lax"
-            }
-            for name, value in session_cookies.items()
-        ])
+    print("\n:: 1 instagram | 2 facebook | 3 gmail | 4 twitter ::\n")
+    choice = input("[choice] > ")
 
-        page = context.new_page()
+    if choice != "1":
+        print("[x] Only Instagram is supported for now.")
+        return
 
-        try:
-            print(f"[*] Navigating to @{target_username}'s profile...")
-            page.goto(f"https://www.instagram.com/{target_username}/", timeout=30000)
-            page.wait_for_load_state('networkidle')
+    print("\n[+] Report Type")
+    print(":: 1 nudity or sexual activity ::")
+    report_choice = input("[choice] > ")
 
-            print("[*] Opening report menu...")
-            page.click('svg[aria-label="More options"]')  # ⋯ menu
+    if report_choice != "1":
+        print("[x] Only 'nudity or sexual activity' is available.")
+        return
 
-            page.wait_for_selector('text=Report', timeout=10000)
-            page.click('text=Report')
-            time.sleep(2)
+    report_reason = "Nudity or sexual activity"
+    target_username = input("\n[?] Target Instagram username > ")
+    total_reports = int(input("[?] Number of reports to send > "))
 
-            page.click('text=It’s inappropriate')
-            time.sleep(2)
+    for i in range(1, total_reports + 1):
+        print(f"\n[•] Starting Report #{i}")
 
-            page.click('text=Report account')
-            time.sleep(2)
+        print("[*] Connecting to VPN...")
+        connect_to_random()
 
-            reason_text = REPORT_OPTIONS.get(report_type)
-            if reason_text:
-                page.click(f'text={reason_text}')
-                time.sleep(2)
-                page.click('text=Submit report')
-                print(f"[✓] Report sent for reason: {reason_text}")
-                return True
-            else:
-                print("[x] Invalid report type.")
-                return False
+        print("[*] Generating email...")
+        email_data = generate_address()
+        email = email_data["address"]
+        token = email_data["token"]
 
-        except Exception as e:
-            print(f"[x] Report failed: {e}")
-            return False
+        full_name = random_string(6) + " " + random_string(5)
+        password = random_string(12)
 
-        finally:
-            context.close()
-            browser.close()
+        result = create_account(
+            email=email,
+            token=token,
+            full_name=full_name,
+            password=password,
+            target_username=target_username,
+            report_reason=report_reason
+        )
+
+        if result is None:
+            print("[x] Failed to create Instagram account.")
+        else:
+            print(f"[✓] Report sent.")
+
+        print(f"|{i}|")
+        time.sleep(2)
+
+    print("\n[✓] Done! Success:", total_reports)
+
