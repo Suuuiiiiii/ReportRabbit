@@ -1,60 +1,66 @@
+import os
 import time
-from vpn import connect_to_vpn
-from mailtm import get_temp_email
-from account_creator import create_account
-from reporter import display_banner
+from ASCII import show_banner
+from reporter import perform_report
 
-# Configuration
-TARGET_USERNAME = "target_account_here"  # replace this
-REPORT_REASON = "Nudity or sexual activity"
-REPORT_COUNT = 1  # how many reports to attempt
+def clear():
+    os.system("clear" if os.name == "posix" else "cls")
+
+def ask(prompt, choices):
+    while True:
+        print(f"\n{prompt}")
+        for i, choice in enumerate(choices, 1):
+            print(f"{i}. {choice}")
+        try:
+            answer = int(input("\n> "))
+            if 1 <= answer <= len(choices):
+                return choices[answer - 1]
+        except:
+            continue
+        print("[x] Invalid choice. Try again.")
 
 def main():
-    success = 0
-    fail = 0
+    clear()
+    show_banner()
 
-    display_banner()
+    # Step 1 - Platform (only Instagram for now)
+    platform = ask("Choose platform to report on:", ["Instagram"])
 
-    for i in range(1, REPORT_COUNT + 1):
-        print(f"\n[•] Starting Report #{i}")
+    # Step 2 - Reason
+    reason = ask("Choose report reason:", ["Nudity or sexual activity"])
 
+    while True:
+        # Step 3 - Target username
+        target_username = input("\nEnter target username: @").strip().lstrip("@")
+        if not target_username:
+            print("[x] Username cannot be empty.")
+            continue
+
+        # Step 4 - Number of reports
         try:
-            print("[*] Connecting to VPN...")
-            connect_to_vpn()
-            time.sleep(5)
+            count = int(input("\nHow many reports to send? > "))
+        except ValueError:
+            print("[x] Invalid number.")
+            continue
 
-            email_info = get_temp_email()
-            if not email_info:
-                print("[x] Failed to get temp email.")
-                fail += 1
-                continue
-
-            print(f"[✓] Temp email created: {email_info['address']}")
-
-            full_name = "John Doe"
-            password = "StrongP@ssword123"
-
-            result = create_account(
-                email_info["address"],
-                email_info["token"],
-                full_name,
-                password,
-                TARGET_USERNAME,
-                REPORT_REASON
-            )
-
+        success = 0
+        for i in range(count):
+            print(f"\n[•] Starting Report #{i+1}")
+            result = perform_report(target_username, reason)
             if result:
-                print("[✓] Report successfully submitted.")
                 success += 1
+                print(f"[✓] Report #{i+1} complete.")
             else:
-                print("[x] Failed to create Instagram account.")
-                fail += 1
+                print(f"[x] Report #{i+1} failed.")
+            print(f"\n| {success} |")
+            time.sleep(2)
 
-        except KeyboardInterrupt:
-            print("\n[x] Interrupted.")
+        print(f"\n[✓] Done! Success: {success}, Failed: {count - success}\n")
+        again = input("Do you want to report another target? (y/n) > ").strip().lower()
+        if again != "y":
             break
-
-    print(f"\n[✓] Done! Success: {success}, Failed: {fail}")
+        clear()
+        show_banner()
 
 if __name__ == "__main__":
     main()
