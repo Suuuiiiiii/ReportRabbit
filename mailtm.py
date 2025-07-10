@@ -1,73 +1,58 @@
+# mailtm.py
 import requests
 import time
-import re
+import random
+import string
 
 BASE_URL = "https://api.mail.tm"
 
-def create_temp_email():
-    try:
-        print("[*] Generating temporary email...")
-        domain_resp = requests.get(f"{BASE_URL}/domains")
-        domain_resp.raise_for_status()
-        domain = domain_resp.json()["hydra:member"][0]["domain"]
+def generate_random_name():
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=12))
 
-        username = f"pdo{int(time.time())}"
-        address = f"{username}@{domain}"
-        password = "PDOtool123"
+def generate_address():
+    username = generate_random_name()
+    domain = "mechanicspedia.com"  # or use domains from mail.tm's list
+    email = f"{username}@{domain}"
+    password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
 
-        # Register
-        register = requests.post(f"{BASE_URL}/accounts", json={
-            "address": address,
-            "password": password
-        })
+    # Create account
+    response = requests.post(f"{BASE_URL}/accounts", json={
+        "address": email,
+        "password": password
+    })
 
-        if register.status_code != 201:
-            print("[x] Failed to register temp email.")
-            return None
+    if response.status_code not in [200, 201]:
+        raise Exception(f"Failed to create temp email: {response.text}")
 
-        # Authenticate
-        auth = requests.post(f"{BASE_URL}/token", json={
-            "address": address,
-            "password": password
-        })
+    # Get token
+    token_resp = requests.post(f"{BASE_URL}/token", json={
+        "address": email,
+        "password": password
+    })
+    token = token_resp.json()["token"]
 
-        if auth.status_code != 200:
-            print("[x] Failed to authenticate temp email.")
-            return None
-
-        token = auth.json()["token"]
-        print(f"[✓] Temp email created: {address}")
-        return {"address": address, "token": token}
-
-    except Exception as e:
-        print(f"[x] Mail.tm error: {e}")
-        return None
-
+    print(f"[✓] Temp email created: {email}")
+    return email, token
 
 def wait_for_code(token, timeout=120):
-    print("[*] Waiting for verification code...")
     headers = {"Authorization": f"Bearer {token}"}
-    start = time.time()
+    print("[*] Waiting for verification email...")
 
-    while time.time() - start < timeout:
-        try:
-            msgs = requests.get(f"{BASE_URL}/messages", headers=headers)
-            msgs.raise_for_status()
-            messages = msgs.json()["hydra:member"]
+    for _ in range(timeout):
+        resp = requests.get(f"{BASE_URL}/messages", headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data["hydra:member"]:
+                msg_id = data["hydra:member"][0]["id"]
+                msg_resp = requests.get(f"{BASE_URL}/messages/{msg_id}", headers=headers)
+                msg_text = msg_resp.json()["text"]
 
-            for msg in messages:
-                if "Instagram" in msg["from"]["address"] or "security code" in msg["subject"]:
-                    msg_detail = requests.get(f"{BASE_URL}/messages/{msg['id']}", headers=headers)
-                    content = msg_detail.json()["text"]
-                    match = re.search(r"\b(\d{6})\b", content)
-                    if match:
-                        code = match.group(1)
-                        print(f"[✓] Code received: {code}")
-                        return code
-        except:
-            pass
+                # Extract 6-digit code
+                import re
+                match = re.search(r"\b\d{6}\b", msg_text)
+                if match:
+                    return match.group(0)
 
-        time.sleep(5)
+        time.sleep(1)
 
-    print("[x] Timed out waiting for code.")
     return None
