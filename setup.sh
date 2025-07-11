@@ -1,16 +1,12 @@
-#!/bin/bash
 
 echo "🔧 Setting up ReportRabbit..."
 
-# Install Python deps
 echo "📦 Installing Python requirements..."
 pip install -r requirements.txt
 
-# Playwright setup
 echo "🎭 Installing Playwright browsers..."
 playwright install
 
-# Windscribe check
 if ! command -v windscribe &> /dev/null; then
     echo "⚠️  Windscribe CLI not found. Install it manually from https://windscribe.com/guides/linux"
 else
