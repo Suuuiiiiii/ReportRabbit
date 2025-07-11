@@ -94,5 +94,5 @@ This tool is for **educational purposes only**. Mass reporting violates Instagra
 - **This is a work in progress!** Expect bugs.  
 - **Run in a virtual environment** (`venv`) to avoid dependency conflicts.  
 - **Windscribe must be running manually** (No API integration yet).  
-
+- **If you manage to find an error or have improvements in the code please report it to report0rabbit@gmail.com** thank you.
 ---
