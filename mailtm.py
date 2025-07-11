@@ -1,4 +1,3 @@
-# mailtm.py
 import requests
 import time
 import random
@@ -15,7 +14,6 @@ def generate_address():
     email = f"{username}@{domain}"
     password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
 
-    # Create account
     response = requests.post(f"{BASE_URL}/accounts", json={
         "address": email,
         "password": password
@@ -24,7 +22,6 @@ def generate_address():
     if response.status_code not in [200, 201]:
         raise Exception(f"Failed to create temp email: {response.text}")
 
-    # Get token
     token_resp = requests.post(f"{BASE_URL}/token", json={
         "address": email,
         "password": password
