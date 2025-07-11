@@ -19,104 +19,82 @@ def generate_password():
     return ''.join(random.choices(string.ascii_letters + string.digits, k=10))
 
 
-def perform_report():
+def perform_report(target_username, report_reason):
+    success_count = 0
+
     while True:
         os.system("clear")
         show_banner()
+        print(f"\n[•] Starting Report #{success_count + 1}")
+        print("[*] Connecting to VPN...")
+        connect_to_random()
 
-        # Select report reason
-        print("\n[1] Nudity or sexual activity\n")
-        reason_input = input("[?] Choose report type [1]: ").strip()
-        report_reason = "Nudity or sexual activity"  # Only one for now
+        email, token = generate_address()
+        full_name = generate_random_name()
+        password = generate_password()
 
-        # Target username
-        target_username = input("[?] Target Instagram username: ").strip()
+        print(f"[✓] Temp email created: {email}")
 
-        # Number of reports
-        try:
-            total_reports = int(input("[?] Number of reports: "))
-        except:
-            print("[x] Invalid number.")
+        session_info = create_account(email, token, full_name, password)
+        if not session_info:
+            print("[x] Failed to create Instagram account.")
             continue
 
-        success_count = 0
-        for i in range(total_reports):
-            print(f"\n[•] Starting Report #{i + 1}")
-            print("[*] Connecting to VPN...")
-            connect_to_random()
+        print("[*] Logging in to perform report...")
 
-            # Generate temp mail
-            email, token = generate_address()
-            print(f"[✓] Temp email created: {email}")
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context()
+                page = context.new_page()
 
-            # Generate account
-            full_name = generate_random_name()
-            password = generate_password()
+                for name, value in session_info["session"].items():
+                    context.add_cookies([{
+                        "name": name,
+                        "value": value,
+                        "domain": ".instagram.com",
+                        "path": "/",
+                        "httpOnly": True,
+                        "secure": True
+                    }])
 
-            session_info = create_account(email, token, full_name, password)
-            if not session_info:
-                print("[x] Failed to create Instagram account.")
-                continue
+                page.goto("https://www.instagram.com/", timeout=60000)
+                page.wait_for_load_state("networkidle")
+                time.sleep(3)
 
-            print("[*] Logging in to perform report...")
+                page.click("svg[aria-label='Search']")
+                time.sleep(1)
+                page.fill("input[placeholder='Search']", target_username)
+                time.sleep(2)
 
-            try:
-                with sync_playwright() as p:
-                    browser = p.chromium.launch(headless=True)
-                    context = browser.new_context()
-                    page = context.new_page()
-
-                    # Set session cookies
-                    for name, value in session_info["session"].items():
-                        context.add_cookies([{
-                            "name": name,
-                            "value": value,
-                            "domain": ".instagram.com",
-                            "path": "/",
-                            "httpOnly": True,
-                            "secure": True
-                        }])
-
-                    page.goto("https://www.instagram.com/", timeout=60000)
-                    page.wait_for_load_state("networkidle")
-
+                try:
+                    page.click(f"text={target_username}")
                     time.sleep(3)
+                except:
+                    print("[x] Account not found A.N.F")
+                    input("[↩] Press Enter to enter a new username...")
+                    return False
 
-                    # Click search
-                    page.click("svg[aria-label='Search']")
-                    time.sleep(1)
-                    page.fill("input[placeholder='Search']", target_username)
-                    time.sleep(2)
+                page.click("svg[aria-label='Options']")
+                time.sleep(1)
+                page.click("text=Report")
+                time.sleep(1)
+                page.click("text=Report Account")
+                time.sleep(1)
+                page.click("text=It's posting content that shouldn't be on Instagram")
+                time.sleep(1)
+                page.click(f"text={report_reason}")
+                time.sleep(1)
+                page.click(f"text={report_reason}")
+                print("[✓] Report submitted.")
 
-                    # Check if username appears in dropdown
-                    try:
-                        page.click(f"text={target_username}")
-                        time.sleep(3)
-                    except:
-                        print("[x] Account not found A.N.F")
-                        break  # Exit loop, go back to ask username again
+                success_count += 1
+                print(f"| {success_count} |")
 
-                    # Click 3-dot menu
-                    page.click("svg[aria-label='Options']")
-                    time.sleep(1)
-                    page.click("text=Report")
-                    time.sleep(1)
-                    page.click("text=Report Account")
-                    time.sleep(1)
-                    page.click("text=It's posting content that shouldn't be on Instagram")
-                    time.sleep(1)
-                    page.click(f"text={report_reason}")
-                    time.sleep(1)
-                    page.click(f"text={report_reason}")  # confirm
-                    print(f"[✓] Report submitted.")
-                    success_count += 1
-                    print(f"|{success_count}|")
+                context.close()
+                browser.close()
+                return True
 
-                    context.close()
-                    browser.close()
-
-            except Exception as e:
-                print(f"[x] Failed to submit report: {e}")
-
-        # After the loop, return to username step
-        input("\n[↩] Press Enter to return to target entry...")
+        except Exception as e:
+            print(f"[x] Failed to report: {e}")
+            return False
