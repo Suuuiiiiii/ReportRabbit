@@ -1,4 +1,3 @@
-# vpn.py
 import subprocess
 import random
 
@@ -8,10 +7,8 @@ def connect_to_random():
     print(f"[*] Connecting to VPN ({country})...")
 
     try:
-        # Disconnect any existing connection
         subprocess.run(["windscribe", "disconnect"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # Connect to selected country
         subprocess.run(["windscribe", "connect", country], check=True)
         print("[✓] VPN connected.")
     except subprocess.CalledProcessError:
