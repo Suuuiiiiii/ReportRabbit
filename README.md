@@ -1,4 +1,4 @@
-# **ReportRabbit** 🚨  
+# **ReportRabbit** 🐇  
 *A Playwright-powered Instagram mass-reporting tool (Unstable/In Development)*  
 
 📧 **Contact**: [report0rabbit@gmail.com](mailto:report0rabbit@gmail.com)  
