@@ -80,7 +80,7 @@ def create_account(email, token, full_name, password):
             session = {
                 cookie["name"]: cookie["value"]
                 for cookie in cookies
-                if ".instagram.com" in cookie["domain"]
+                if cookie["domain"] and cookie["domain"].endswith(".instagram.com")
             }
 
             context.close()
