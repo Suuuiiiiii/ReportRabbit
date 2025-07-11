@@ -23,20 +23,16 @@ def main():
     clear()
     show_banner()
 
-    # Step 1 - Platform (only Instagram for now)
     platform = ask("Choose platform to report on:", ["Instagram"])
 
-    # Step 2 - Reason
     reason = ask("Choose report reason:", ["Nudity or sexual activity"])
 
     while True:
-        # Step 3 - Target username
         target_username = input("\nEnter target username: @").strip().lstrip("@")
         if not target_username:
             print("[x] Username cannot be empty.")
             continue
 
-        # Step 4 - Number of reports
         try:
             count = int(input("\nHow many reports to send? > "))
         except ValueError:
